@@ -1,105 +1,94 @@
-# Clinic Copilot: Intelligent Clinical Triage Assistant
+# Clinic Copilot
 
-An AI-powered medical assistant utilizing the Google Gemma LLM client alongside a rule-based expert system for automated response evaluation and patient triage.
+A multilingual **clinic triage support prototype** built with **Python** and **Streamlit**. It asks a patient a few structured questions, sorts the case into one of **4 urgency levels** with fixed, transparent rules, and shows a short explanation in **English, Telugu or Korean**.
 
----
+**Live demo:** https://kousalyak03-clinic-copilot-app-3yderz.streamlit.app/
+(The free Streamlit app sleeps when unused; if you see "wake up", click it and wait about a minute.)
 
-## Project Overview
-
-**Clinic Copilot** is a Python-based intelligent decision support tool designed to streamline patient intake and clinical triage. The platform combines deterministic clinical triage rules with generative AI (Google Gemma LLM) to analyze patient symptoms, evaluate severity, and suggest safe, structured healthcare routing pathways (e.g., Immediate Care, Scheduled Appointment, or Home Care).
-
-### Key Technical Achievements
-* **Hybrid Architecture:** Blends programmatic safety-rule logic with LLM flexibility to prevent hallucinations in critical medical paths.
-* **Intelligent Evaluation:** Evaluates response quality and matches conversational symptom inputs against strict triage parameters.
-* **Modular Engineering:** Decoupled architecture allows effortless client swapping or rules customization.
+> **Prototype only, not medical advice.** It does not diagnose or prescribe. In the public demo the AI model call is turned off. All urgency decisions come from the rules in `triage_rules.py`.
 
 ---
 
-## Tech Stack
+## What it does
 
-* **Language:** Python 3.10+
-* **AI/LLM Engine:** Google Gemma LLM via API client execution
-* **Libraries:** Python environment abstractions, `requests` / standard HTTP tooling
+1. **Choose a language:** English, Telugu or Korean.
+2. **Describe the complaint**, e.g. "fever and cough", or click a quick demo case (**Fever**, **Chest Pain**, **Mild Cold**).
+3. **Answer 3 follow-up questions.** The questions depend on the complaint:
+   - **Fever / cough / cold:** how many days, difficulty breathing, high fever or chills
+   - **Chest pain:** when it started, whether the pain spreads to the arm, jaw or back, shortness of breath
+   - **Anything else:** when it started, how severe, other symptoms
+4. **See the result:**
+   - A color-coded **risk level** with the reasons behind it
+   - A **patient explanation** in the selected language
+   - A **structured summary** (complaint, answers, risk level, reasons) for clinic staff
+   - The **prompt** that would be sent to the Gemma model
 
----
+## Urgency levels (rules in `triage_rules.py`)
 
-## Repository Structure
+| Level | Color | When it's assigned |
+|---|---|---|
+| **Emergency** | Red | Chest pain spreading to the arm, jaw or back · chest pain with shortness of breath · difficulty breathing |
+| **Urgent** | Orange | High fever or chills · symptoms lasting 7+ days · severe symptoms |
+| **Routine** | Green | No red flags found |
+| **Self-care** | Blue | At least 2 mild signs: mild severity, no breathing difficulty, no fever, symptoms for 2 days or less |
+
+Emergency rules are checked first. Urgent rules run only if the case isn't already an emergency, and self-care only if it's still routine.
+
+## Why rules decide, not the AI
+
+Urgency is a safety decision, so it's made by **fixed rules that can be read and tested**, not by a language model that could give a different answer each time. The AI's job is limited to wording: summarizing the case and writing patient-friendly guidance.
+
+## Role of Gemma (AI model)
+
+- `gemma_client.py` builds a prompt with the complaint, the answers and the selected language. The prompt tells the model to summarize, list red flags and write simple guidance, and **not** to diagnose or prescribe.
+- **In this repository and the public demo, the model call is disabled.** The app shows the prompt preview and a note instead of a model response.
+- During development, Gemma was run locally through **Ollama**.
+
+## Tech stack
+
+| Part | Technology |
+|---|---|
+| Language | Python |
+| Web app | Streamlit |
+| Triage logic | Plain Python rules (`triage_rules.py`) |
+| AI model | Google Gemma via Ollama (local development only) |
+| Hosting | Streamlit Community Cloud |
+
+## Project structure
 
 ```text
 clinic-copilot/
-├── app.py              # Main application workflow engine
-├── gemma_client.py     # Interface wrapper for Google Gemma LLM API interactions
-├── triage_rules.py     # Expert system rules & severity mapping parameters
-├── requirements.txt    # Declared project dependencies
-└── README.md           # Technical documentation
+├── app.py              # Streamlit UI: language, complaint, questions, results, demo cases
+├── triage_rules.py     # Rule-based risk levels and the reasons for each
+├── gemma_client.py     # Builds the Gemma prompt (model call disabled in the demo)
+├── requirements.txt    # streamlit, pydantic, ollama
+└── README.md
 ```
 
----
+## Run it locally
 
-## Architecture & Data Flow
-
-1. **Input Intake:** The application receives patient symptom declarations and demographic contexts.
-2. **Deterministic Triage (`triage_rules.py`):** High-risk keywords, symptoms, or combinations are evaluated by hardcoded guidelines to instantly catch emergency baselines.
-3. **AI Evaluation Context (`gemma_client.py`):** The context passes down to the Google Gemma model with explicit, zero-shot system prompts instructing it to safely gauge clinical priority.
-4. **Output Synthesis (`app.py`):** System displays clear triage recommendations, reasoning protocols, and next-step actions.
-
----
-
-## Local Installation & Setup
-
-Follow these steps to deploy and explore the repository environment locally:
-
-### 1. Prerequisite Environments
-Ensure your machine runs Python 3.10 or higher. Verify your local installation via:
-```bash
-python --version
-```
-
-### 2. Clone the Repository
 ```bash
 git clone https://github.com/KousalyaKadimella/clinic-copilot.git
 cd clinic-copilot
-```
-
-### 3. Initialize a Virtual Environment
-Isolate your dependency trees using an explicit Python virtual environment:
-```bash
-# Create the environment
-python -m venv venv
-
-# Activate on macOS/Linux
-source venv/bin/activate
-
-# Activate on Windows
-venv\Scripts\activate
-```
-
-### 4. Install Dependencies
-```bash
-pip install --upgrade pip
+python3 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+streamlit run app.py              # opens http://localhost:8501
 ```
 
-### 5. Running the Tool
-Execute the root system processor via terminal:
-```bash
-python app.py
-```
+## Known limitations
+
+- Only 3 question sets (fever/cough/cold, chest pain, general), matched by keywords in the complaint.
+- "Mild difficulty" breathing is not treated as a red flag; only "Yes" is.
+- The model call is disabled in this version, so explanations come from fixed text, not the AI.
+- Not tested with clinicians or real patients.
+
+## Possible improvements
+
+- Unit tests for every rule in `triage_rules.py`
+- More complaint types and questions
+- Turn the Gemma call back on with a hosted model, and check its output before showing it
 
 ---
 
-## Medical & Architecture Safeguards
-
-* **Rule Fallbacks:** When LLMs take too long to resolve or find ambiguous terminology, `triage_rules.py` implements structured logic trees to safely default to high-severity precautions.
-* **Sanitized Evaluation Prompts:** Prompts are restricted from giving actionable single-drug prescriptions, focusing instead on diagnostic category suggestion and priority processing.
-
----
-
-## Author
-
-**Kousalya Kadimella**  
-*MS in Computer Science*  
-California State University, Dominguez Hills
-
----
-*Disclaimer: This tool is built as an educational research asset exploring hybrid NLP automation pipelines. It does not replace professional medical advice, clinical diagnoses, or urgent emergency interventions.*
+**Kousalya Kadimella** · M.S. Computer Science, CSU Dominguez Hills
